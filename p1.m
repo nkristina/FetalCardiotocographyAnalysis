@@ -102,15 +102,15 @@ arhitektura = {[10, 5], [12, 6, 3], [4 5 6]};
 Abest = 0;
 F1best = 0;
 
-for reg = [0.1, 0.5, 0.9]
-    for w = [1, 2, 5]
-        for lr = [0.5, 0.05, 0.005]
+for reg = [0.01, 0.1, 0.3]
+    for w = [1, 1.2, 1.5, 2]
+        for lr = [1, 0.5, 0.05, 0.005]
             for arh = 1:length(arhitektura)
                 rng(5)
                 net = patternnet(arhitektura{arh});
                 
                 for i = 1:length(arhitektura{arh})
-                    net.layers{i}.transferFcn = 'poslin';
+                    net.layers{i}.transferFcn = 'tansig';
                 end
                 
                 net.divideFcn = 'divideind';
@@ -120,10 +120,10 @@ for reg = [0.1, 0.5, 0.9]
 
                 net.performParam.regularization = reg;
 
-                net.trainFcn = 'trainscg';
+                net.trainFcn = 'traingdm';
 
                 net.trainParam.lr = lr;
-                net.trainParam.epochs = 2000;
+                net.trainParam.epochs = 2500;
                 net.trainParam.goal = 1e-4;
                 net.trainParam.max_fail = 20;
 
@@ -141,10 +141,19 @@ for reg = [0.1, 0.5, 0.9]
 
                 [~, cm] = confusion(izlazVal, out);
                 A = 100*sum(trace(cm))/sum(sum(cm));
-                F1 = 2*cm(2, 2)/(cm(2, 1)+cm(1, 2)+2*cm(2, 2))*100;
+                cm=cm';
+                prec = zeros(3,1);
+                rec = zeros(3,1);
+                fi = zeros(3,1);
+                for i = 1:3
+                    prec(i,1) = cm(i,i)/(cm(i,1)+cm(i,2)+cm(i,3));
+                    rec(i,1) = cm(i,i)/(cm(1,i)+cm(2,i)+cm(3,i));
+                    fi(i,1) = 2*prec(i,1)*rec(i,1)/(prec(i,1)+rec(i,1));
+                end
+                F1 = sum(fi(:,1))/3*100;
 
                 disp(['Reg = ' num2str(reg) ', ACC = ' num2str(A) ', F1 = ' num2str(F1)])
-                disp(['LR = ' num2str(lr) ', epoch = ' num2str(info.best_epoch)])
+                disp(['LR = ' num2str(lr) ', epoch = ' num2str(info.best_epoch) ',weight = ' num2str(w) 'reg = ' num2str(reg)])
 
                 if F1 > F1best
                     F1best = F1;
@@ -165,9 +174,13 @@ net = patternnet(arh_best);
 
 net.divideFcn = '';
 
+for i = 1:length(arh_best)
+    net.layers{i}.transferFcn = 'tansig';
+end
+                
 net.performParam.regularization = reg_best;
 
-net.trainFcn = 'trainscg';
+net.trainFcn = 'traingdm';
 
 net.trainParam.lr = lr_best;
 
