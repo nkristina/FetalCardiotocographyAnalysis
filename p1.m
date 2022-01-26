@@ -146,7 +146,10 @@ for reg = [0.01, 0.1, 0.3]
                 rec = zeros(3,1);
                 fi = zeros(3,1);
                 for i = 1:3
-                    prec(i,1) = cm(i,i)/(cm(i,1)+cm(i,2)+cm(i,3));
+                    prec(i,1) = sum(cm(i,:));
+                    if sum(cm(i,:))~=0
+                        prec(i,1) = cm(i,i)/(cm(i,1)+cm(i,2)+cm(i,3));
+                    end
                     rec(i,1) = cm(i,i)/(cm(1,i)+cm(2,i)+cm(3,i));
                     fi(i,1) = 2*prec(i,1)*rec(i,1)/(prec(i,1)+rec(i,1));
                 end
