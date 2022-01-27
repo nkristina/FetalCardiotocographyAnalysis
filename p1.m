@@ -4,10 +4,8 @@ pod = readtable('CTG.csv');
 rng(50)
 
 %% Ucitavanje podactaka
-%ulaz = [pod.b, pod.e, pod.LBE, pod.LB, pod.AC, pod.FM, pod.UC, pod.ASTV, pod.MSTV, pod.ALTV, pod.MLTV, pod.DL, pod.DS, pod.DP, pod.DR, pod.Width, pod.Min, pod.Max, pod.Nmax, pod.Nzeros, pod.Mode, pod.Mean, pod.Median, pod.Variance, pod.Tendency];
-%izlaz = [pod.A, pod.B, pod.C, pod.D, pod.E, pod.AD, pod.DE, pod.LD, pod.FS, pod.SUSP, pod.CLASS, pod.NSP];
 
-ulaz = [pod.b, pod.e, pod.LBE, pod.LB, pod.AC, pod.FM, pod.UC, pod.ASTV, pod.MSTV, pod.ALTV, pod.MLTV, pod.DL, pod.DS, pod.DP, pod.DR, pod.Width, pod.Min, pod.Max, pod.Nmax, pod.Nzeros, pod.Mode, pod.Mean, pod.Median, pod.Variance, pod.Tendency, pod.A, pod.B, pod.C, pod.D, pod.E, pod.AD, pod.DE, pod.LD, pod.FS, pod.SUSP];
+ulaz = [pod.b, pod.e, pod.LBE, pod.LB, pod.AC, pod.FM, pod.UC, pod.ASTV, pod.MSTV, pod.ALTV, pod.MLTV, pod.DL, pod.DS, pod.DP, pod.DR, pod.Width, pod.Min, pod.Max, pod.Nmax, pod.Nzeros, pod.Mode, pod.Mean, pod.Median, pod.Variance, pod.Tendency];%, pod.A, pod.B, pod.C, pod.D, pod.E, pod.AD, pod.DE, pod.LD, pod.FS, pod.SUSP];
 izlaz = pod.NSP;
 
 ulaz = ulaz';
@@ -101,9 +99,9 @@ izlazSve = [izlazTr, izlazVal];
 arhitektura = {[10, 5], [12, 6, 3], [4 5 6]};
 Abest = 0;
 F1best = 0;
-
+fi_best = 0;
 for reg = [0.01, 0.1, 0.3]
-    for w = [1, 1.2, 1.5, 2]
+    for w = [1, 1.3, 1.5, 2]
         for lr = [1, 0.5, 0.05, 0.005]
             for arh = 1:length(arhitektura)
                 rng(5)
@@ -126,9 +124,11 @@ for reg = [0.01, 0.1, 0.3]
                 net.trainParam.epochs = 2500;
                 net.trainParam.goal = 1e-4;
                 net.trainParam.max_fail = 20;
-
+                net.trainParam.showWindow = false;
+                
                 weight = ones(1, length(izlazSve));
-                weight(:,izlazSve(1,:) == 1) = w;
+                weight(:,izlazSve(2,:) == 1) = w;
+	        weight(:,izlazSve(3,:) == 1) = w;
 
                 [net, info] = train(net, ulazSve, izlazSve, [], [], weight);
 
@@ -146,12 +146,16 @@ for reg = [0.01, 0.1, 0.3]
                 rec = zeros(3,1);
                 fi = zeros(3,1);
                 for i = 1:3
-                    prec(i,1) = sum(cm(i,:));
                     if sum(cm(i,:))~=0
                         prec(i,1) = cm(i,i)/(cm(i,1)+cm(i,2)+cm(i,3));
                     end
+                    
                     rec(i,1) = cm(i,i)/(cm(1,i)+cm(2,i)+cm(3,i));
-                    fi(i,1) = 2*prec(i,1)*rec(i,1)/(prec(i,1)+rec(i,1));
+                    
+                    if(prec(i,1)+rec(i,1)~=0)
+                        fi(i,1) = 2*prec(i,1)*rec(i,1)/(prec(i,1)+rec(i,1));
+                    end
+                    
                 end
                 F1 = sum(fi(:,1))/3*100;
 
@@ -166,6 +170,7 @@ for reg = [0.01, 0.1, 0.3]
                     lr_best = lr;
                     arh_best = arhitektura{arh};
                     ep_best = info.best_epoch;
+                    fi_best = fi(2, 1)/2 + fi(3,1)/2;
                 end
             end
         end
@@ -191,7 +196,8 @@ net.trainParam.epochs = ep_best;
 net.trainParam.goal = 1e-4;
 
 weight = ones(1, length(izlazSve));
-weight(:,izlazSve(1,:) == 1) = w_best;
+weight(:,izlazSve(2,:) == 1) = w_best;
+weight(:,izlazSve(3,:) == 1) = w;
 
 [net, info] = train(net, ulazSve, izlazSve, [], [], weight);
 
@@ -203,3 +209,49 @@ out(1,ind==1)=1;
 out(2,ind==2)=1;
 out(3,ind==3)=1;
 figure, plotconfusion(izlazTe, out);
+[~, cm] = confusion(izlazTe, out);
+A = 100*sum(trace(cm))/sum(sum(cm));
+cm=cm';
+prec = zeros(3,1);
+rec = zeros(3,1);
+fi = zeros(3,1);
+for i = 1:3
+    if sum(cm(i,:))~=0
+        prec(i,1) = cm(i,i)/(cm(i,1)+cm(i,2)+cm(i,3));
+    end
+
+    rec(i,1) = cm(i,i)/(cm(1,i)+cm(2,i)+cm(3,i));
+
+    if(prec(i,1)+rec(i,1)~=0)
+        fi(i,1) = 2*prec(i,1)*rec(i,1)/(prec(i,1)+rec(i,1));
+    end
+
+end
+F1 = sum(fi(:,1))/3*100;
+%% na treningu
+pred = sim(net, ulazSve);
+[v, ind] = max(pred);
+out = zeros(3,length(pred));
+out(1,ind==1)=1;
+out(2,ind==2)=1;
+out(3,ind==3)=1;
+figure, plotconfusion(izlazSve, out);
+[~, cm] = confusion(izlazSve, out);
+A = 100*sum(trace(cm))/sum(sum(cm));
+cm=cm';
+prec = zeros(3,1);
+rec = zeros(3,1);
+fi = zeros(3,1);
+for i = 1:3
+    if sum(cm(i,:))~=0
+        prec(i,1) = cm(i,i)/(cm(i,1)+cm(i,2)+cm(i,3));
+    end
+
+    rec(i,1) = cm(i,i)/(cm(1,i)+cm(2,i)+cm(3,i));
+
+    if(prec(i,1)+rec(i,1)~=0)
+        fi(i,1) = 2*prec(i,1)*rec(i,1)/(prec(i,1)+rec(i,1));
+    end
+
+end
+F1 = sum(fi(:,1))/3*100;
